@@ -1,0 +1,273 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A tool to calculate the result of an item infusion in Destiny.">
+    <meta manifest="infusing.manifest">
+    <title>Destiny Infusion Calculator</title>
+    <style>
+      html {
+        box-sizing: border-box;
+      }
+
+      *, *:before, *:after {
+        box-sizing: inherit;
+      }
+
+      body {
+        font-family: sans-serif;
+        margin: 0.5em;
+      }
+
+      .container {
+        margin: 0 auto;
+        max-width: 400px;
+      }
+
+      input[type="number"] {
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        display: block;
+        font-size: 1.5em;
+        outline: none;
+        padding: 0.25em;
+        width: 100%;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+      }
+
+      input:invalid {
+        border: 1px solid #a94442;
+      }
+
+      h1 {
+        text-align: center;
+      }
+
+      @keyframes bounce {
+        from { top: -3px; }
+        to { top: 3px; }
+      }
+
+      .arrow {
+        animation: bounce 1s infinite alternate backwards;
+        margin: 1em auto;
+        position: relative;
+        width: 30px;
+      }
+
+      .arrow path {
+        stroke: #ccc;
+        fill: none;
+        stroke-width: 2px;
+      }
+
+      label.quiet {
+        color: #ccc;
+        font-size: 0.9em;
+        text-transform: uppercase;
+      }
+
+      #output {
+        background: #eee;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+        margin: 0 auto;
+        padding: 0.5em;
+        text-align: center;
+      }
+
+      .target label {
+        border-radius: 4px 4px 0 0;
+        color: rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+        display: block;
+        float: left;
+        padding: 0.75em 0;
+        text-align: center;
+        width: 50%;
+      }
+
+      .target input[type="radio"] {
+        display: none;
+      }
+
+      .target .legendary {
+        background-color: rgba(82, 48, 101, 0.1);
+      }
+
+      .target input:checked + .legendary {
+        background-color: rgba(82, 48, 101, 1);
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .target .exotic {
+        background-color: rgba(208, 176, 51, 0.1);
+      }
+
+      .target input:checked + .exotic {
+        color: rgba(255, 255, 255, 0.9);
+        background-color: rgba(208, 176, 51, 1);
+      }
+
+      .target input[type="number"] {
+        border-radius: 0 0 4px 4px;
+      }
+
+      .sr {
+        border: 0;
+        clip: rect(0,0,0,0);
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        padding: 0;
+        position: absolute;
+        width: 1px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <p>
+        <label for="source" class="sr">Source Item</label>
+        <input type="number" id="source" min="220" max="320" value="285">
+      </p>
+
+      <div class="arrow">
+        <svg viewbox="0 0 60 32">
+          <path d="M0 0 L30 32 L60 0"></path>
+        </svg>
+      </div>
+
+      <p class="target">
+        <input type="radio" name="type" value="legendary" id="legendary" checked>
+        <label for="legendary" class="legendary">Legendary</label>
+
+        <input type="radio" name="type" value="exotic" id="exotic">
+        <label for="exotic" class="exotic">Exotic</label>
+
+        <label for="target" class="sr">Target Item</label>
+        <input type="number" id="target" value="280" min="250" max="320">
+      </p>
+
+      <div class="arrow">
+        <svg viewbox="0 0 60 32">
+          <path d="M0 0 L30 32 L60 0"></path>
+        </svg>
+      </div>
+
+      <h2 id="output"></h2>
+    </div>
+
+    <script>
+      var intValue = function() { return parseInt(this.el().value); }
+
+      var localStorageAvail = (function() {
+        try {
+          var storage = window.localStorage;
+          var x = '__storage_test__';
+          storage.setItem(x, x);
+          storage.removeItem(x);
+          return true;
+        }
+        catch(e) {
+          return false;
+        }
+      })();
+
+      var calculator = {
+        init: function() {
+          this.fields.source.el().addEventListener('input', this.handle.bind(this));
+          this.fields.target.el().addEventListener('input', this.handle.bind(this));
+
+          var radios = this.fields.type.el();
+          for (var i = 0; i < radios.length; i++) {
+            radios[i].addEventListener('change', this.handle.bind(this));
+          }
+
+          this.restoreFromStorage();
+          this.handle();
+        },
+
+        fields: {
+          type: {
+            el: function() { return document.querySelectorAll('input[name="type"]') },
+            val: function() {
+              var els = this.el();
+
+              for (var i = 0; i < els.length; i++) {
+                if (els[i].checked === true) {
+                  return els[i].value;
+                }
+              }
+            }
+          },
+
+          target: {
+            el: function () { return document.getElementById('target') },
+            val: intValue
+          },
+
+          source: {
+            el: function() { return document.getElementById('source') },
+            val: intValue
+          },
+
+          output: { el: function() { return document.getElementById('output') } }
+        },
+
+        valid: function() {
+          return this.fields.source.el().checkValidity() === true &&
+                 this.fields.target.el().checkValidity() === true &&
+                 this.fields.source.val() > this.fields.target.val();
+        },
+
+        calculate: function(source, target, exotic) {
+          var exotic     = this.fields.type.val() === 'exotic';
+          var source     = this.fields.source.val();
+          var target     = this.fields.target.val();
+          var multiplier = exotic ? 0.7 : 0.8;
+          var spread     = exotic ? 4 : 5;
+          var delta      = source - target;
+
+          if (delta <= spread) {
+            return source;
+          } else {
+            return Math.round(delta * multiplier) + target;
+          }
+        },
+
+        restoreFromStorage: function() {
+          this.fields.source.el().value = localStorage.getItem('sourceValue');
+          this.fields.target.el().value = localStorage.getItem('targetValue');
+        },
+
+        handle: function() {
+          var source = this.fields.source.el();
+          var target = this.fields.target.el();
+          var output = this.fields.output.el();
+
+          source.setCustomValidity('');
+          target.setCustomValidity('');
+
+          if (this.valid()) {
+            output.innerHTML = this.calculate(this.calculate());
+
+            if (localStorageAvail) {
+              localStorage.setItem('sourceValue', this.fields.source.val());
+              localStorage.setItem('targetValue', this.fields.target.val());
+            }
+          } else {
+            output.innerHTML = '–';
+            source.setCustomValidity('Less than target.');
+            target.setCustomValidity('Greater than source.');
+          }
+        }
+      };
+
+      var myCalc = Object.create(calculator);
+      myCalc.init();
+    </script>
+  </body>
+</html>
