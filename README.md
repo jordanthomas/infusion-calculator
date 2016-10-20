@@ -1,3 +1,3 @@
 # Infusion Calculator
 
-An infusion calculator for Destiny. You can find it over at http://infusing.info.
+### Since Bungie has changed the infusion system this calculator no longer has any utility. Just here for posterity's sake.
